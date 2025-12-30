@@ -6,7 +6,7 @@ const generateTempPassword = () => Math.random().toString(36).slice(-8);
 
 export const createSchool: RequestHandler = async (req, res) => {
   try {
-    const { name, code, address, district, pincode, studentCount, isChainedSchool, adminName, adminPhone, adminEmail } = req.body;
+    const { name, code, address, district, pincode, studentCount, isChainedSchool, adminName, adminPhone, adminEmail, adminPassword } = req.body;
 
     if (!name || !code || !adminName || !adminEmail || !adminPhone) {
       return res.status(400).json({ message: "Missing required fields" });
@@ -22,8 +22,10 @@ export const createSchool: RequestHandler = async (req, res) => {
       return res.status(409).json({ message: "Admin email already exists" });
     }
 
-    const tempPassword = generateTempPassword();
-    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+    // Use provided password or generate a temporary one
+    const passwordToUse = adminPassword && adminPassword.trim() !== "" ? adminPassword : generateTempPassword();
+    const hashedPassword = await bcrypt.hash(passwordToUse, 10);
+    const isCustomPassword = adminPassword && adminPassword.trim() !== "";
 
     const result = await prisma.$transaction(async (tx) => {
       const school = await tx.school.create({
@@ -37,10 +39,16 @@ export const createSchool: RequestHandler = async (req, res) => {
       return { school, admin };
     });
 
-    return res.status(201).json({
+    // Only return temporary password if it was auto-generated
+    const response: any = {
       school: { ...result.school, admin: { id: result.admin.id, name: result.admin.name, email: result.admin.email, phone: result.admin.phone } },
-      temporaryPassword: tempPassword,
-    });
+    };
+
+    if (!isCustomPassword) {
+      response.temporaryPassword = passwordToUse;
+    }
+
+    return res.status(201).json(response);
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: "Create school failed" });
@@ -98,7 +106,7 @@ export const getSchool: RequestHandler = async (req, res) => {
 
 export const updateSchool: RequestHandler = async (req, res) => {
   const { id } = req.params;
-  const { name, code, address, district, pincode, studentCount, isActive, isChainedSchool, adminName, adminEmail, adminPhone } = req.body;
+  const { name, code, address, district, pincode, studentCount, isActive, isChainedSchool, adminName, adminEmail, adminPhone, adminPassword } = req.body;
 
   try {
     const existingSchool = await prisma.school.findUnique({ where: { id } });
@@ -112,7 +120,7 @@ export const updateSchool: RequestHandler = async (req, res) => {
     }
 
     let targetAdminId: string | null = null;
-    if ("adminName" in req.body || "adminEmail" in req.body || "adminPhone" in req.body) {
+    if ("adminName" in req.body || "adminEmail" in req.body || "adminPhone" in req.body || "adminPassword" in req.body) {
       const admin = await prisma.user.findFirst({ where: { schoolId: id, role: "SCHOOL_ADMIN" } });
       if (admin) {
         targetAdminId = admin.id;
@@ -139,13 +147,22 @@ export const updateSchool: RequestHandler = async (req, res) => {
       });
 
       if (targetAdminId) {
+        // Build admin update data
+        const adminUpdateData: any = {
+          ...(adminName !== undefined && { name: adminName }),
+          ...(adminEmail !== undefined && { email: adminEmail }),
+          ...(adminPhone !== undefined && { phone: adminPhone }),
+        };
+
+        // Handle password update if provided
+        if (adminPassword && adminPassword.trim() !== "") {
+          const hashedPassword = await bcrypt.hash(adminPassword, 10);
+          adminUpdateData.password = hashedPassword;
+        }
+
         await tx.user.update({
           where: { id: targetAdminId },
-          data: {
-            ...(adminName !== undefined && { name: adminName }),
-            ...(adminEmail !== undefined && { email: adminEmail }),
-            ...(adminPhone !== undefined && { phone: adminPhone }),
-          },
+          data: adminUpdateData,
         });
       }
     });

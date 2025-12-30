@@ -59,6 +59,9 @@ export default function SuperAdminDashboard() {
 
   const [form, setForm] = useState<any>(emptyForm);
 
+  // Modal error state - displays errors at the bottom of the modal
+  const [modalError, setModalError] = useState<string | null>(null);
+
   // Toast notifications state
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [toastCounter, setToastCounter] = useState(0);
@@ -105,7 +108,7 @@ export default function SuperAdminDashboard() {
       const res = await api.get("/superadmin/schools");
       setSchools(res.data);
     } catch (err) {
-      console.error("Failed to load schools:", err);
+      // Error handled silently - could show toast if needed
     }
   };
 
@@ -124,6 +127,9 @@ export default function SuperAdminDashboard() {
   
   /* ================= CREATE / UPDATE ================= */
   const submitSchool = async () => {
+    // Clear any previous error when submitting
+    setModalError(null);
+    
     try {
       setLoading(true);
 
@@ -153,8 +159,14 @@ export default function SuperAdminDashboard() {
       
       closeModal();
     } catch (err: any) {
-      console.error("Submit error:", err);
-      showToast(err.response?.data?.message || "Operation failed", "error");
+      // Extract error message from response or use fallback
+      const errorMessage = err.response?.data?.message 
+        || err.response?.data?.error 
+        || err.message 
+        || "An unexpected error occurred. Please try again.";
+      
+      // Set the error to display in the modal (no console.error)
+      setModalError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -168,14 +180,18 @@ export default function SuperAdminDashboard() {
       showToast(`${selectedSchool.name} deleted successfully`, "success");
       setShowDelete(false);
       await loadSchools();
-    } catch (err) {
-      console.error("Delete error:", err);
-      showToast("Failed to delete school", "error");
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message 
+        || err.response?.data?.error 
+        || err.message 
+        || "Failed to delete school";
+      showToast(errorMessage, "error");
     }
   };
 
   const openEdit = (school: School) => {
     setEditingSchool(school);
+    setModalError(null); // Clear any previous errors when opening edit modal
     setForm({
       name: school.name,
       code: school.code ?? "",
@@ -196,6 +212,12 @@ export default function SuperAdminDashboard() {
     setShowModal(false);
     setEditingSchool(null);
     setForm(emptyForm);
+    setModalError(null); // Clear error when closing modal
+  };
+
+  const openCreateModal = () => {
+    setModalError(null); // Clear any previous errors when opening create modal
+    setShowModal(true);
   };
 
   return (
@@ -278,7 +300,7 @@ export default function SuperAdminDashboard() {
             </div>
 
             <button
-                onClick={() => setShowModal(true)}
+                onClick={openCreateModal}
                 className="bg-[#0f1419] hover:bg-black text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-sm"
             >
                 <span>+</span> Create School
@@ -524,6 +546,36 @@ export default function SuperAdminDashboard() {
                     </div>
                 </div>
             </div>
+
+            {/* ERROR DISPLAY - Shows at bottom of modal form */}
+            {modalError && (
+              <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0">
+                    <svg className="w-5 h-5 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="8" x2="12" y2="12"></line>
+                      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-red-800">
+                      {editingSchool ? "Update Failed" : "Creation Failed"}
+                    </h4>
+                    <p className="mt-1 text-sm text-red-700">{modalError}</p>
+                  </div>
+                  <button 
+                    onClick={() => setModalError(null)} 
+                    className="flex-shrink-0 text-red-400 hover:text-red-600 transition-colors"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Modal Footer */}
             <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-100">

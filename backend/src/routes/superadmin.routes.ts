@@ -29,7 +29,7 @@ router.get(
 );
 
 /**
- * LIST SCHOOLS  ✅ (THIS FIXES 404)
+ * LIST SCHOOLS  
  */
 router.get(
   "/schools",

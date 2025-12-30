@@ -8,11 +8,13 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null); // Clear any previous error
 
     try {
       const res = await api.post("/auth/login", {
@@ -35,10 +37,11 @@ export default function LoginPage() {
       } else if (role === "TEACHER") {
         router.push("/teacher/dashboard");
       } else {
-        alert("Unknown role. Please contact admin.");
+        setError("Unknown role. Please contact admin.");
       }
     } catch (err: any) {
-      alert(err.response?.data?.message || "Login failed");
+      // Set error to display inline instead of using alert()
+      setError(err.response?.data?.message || "Login failed. Please check your credentials.");
     } finally {
       setLoading(false);
     }
@@ -158,6 +161,68 @@ export default function LoginPage() {
           margin-top: 30px;
           color: #6b7280;
         }
+
+        /* Error message styles */
+        .error-container {
+          background-color: #fef2f2;
+          border: 1px solid #fecaca;
+          border-radius: 8px;
+          padding: 12px 16px;
+          margin-bottom: 20px;
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .error-icon {
+          flex-shrink: 0;
+          width: 20px;
+          height: 20px;
+          color: #dc2626;
+        }
+
+        .error-content {
+          flex: 1;
+        }
+
+        .error-title {
+          font-size: 0.875rem;
+          font-weight: 600;
+          color: #991b1b;
+          margin: 0 0 2px 0;
+        }
+
+        .error-message {
+          font-size: 0.875rem;
+          color: #dc2626;
+          margin: 0;
+        }
+
+        .error-close {
+          flex-shrink: 0;
+          background: none;
+          border: none;
+          padding: 0;
+          cursor: pointer;
+          color: #f87171;
+          transition: color 0.2s;
+        }
+
+        .error-close:hover {
+          color: #dc2626;
+        }
       `}</style>
 
       <header className="navbar">
@@ -172,13 +237,42 @@ export default function LoginPage() {
 
         <div className="form-card">
           <form onSubmit={handleLogin}>
+            {/* Inline Error Display */}
+            {error && (
+              <div className="error-container">
+                <svg className="error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <div className="error-content">
+                  <p className="error-title">Login Failed</p>
+                  <p className="error-message">{error}</p>
+                </div>
+                <button 
+                  type="button" 
+                  className="error-close" 
+                  onClick={() => setError(null)}
+                  aria-label="Dismiss error"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+            )}
+
             <div className="input-group">
               <input
                 type="email"
                 placeholder="Email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (error) setError(null); // Clear error when user starts typing
+                }}
               />
             </div>
 
@@ -188,7 +282,10 @@ export default function LoginPage() {
                 placeholder="Password"
                 required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (error) setError(null); // Clear error when user starts typing
+                }}
               />
             </div>
 
